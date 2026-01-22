@@ -1,0 +1,9 @@
+[submodule "skill-manager"]
+	path = skill-manager
+	url = https://github.com/stevelin001/skill-manager.git
+[submodule "prompt-quality-checker"]
+	path = prompt-quality-checker
+	url = https://github.com/stevelin001/prompt-quality-checker.git
+[submodule "daily-record"]
+	path = daily-record
+	url = https://github.com/stevelin001/daily-record.git
