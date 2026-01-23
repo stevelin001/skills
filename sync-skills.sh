@@ -1,24 +1,26 @@
 #!/usr/bin/env bash
-# Skills Sync Script - 从共享仓库同步到各个 AI 工具（支持 Submodules）
+# Skills Sync Script - 混合架构（自己的 skills + 别人的 submodules）
 
 SOURCE_DIR="/Users/bluesky/workspace/skills"
 
-# 定义要同步的 skills（这些是 submodule 名称）
-SKILLS=(
-    "daily-record"
-    "prompt-quality-checker"
-    "skill-manager"
+# 自己的 skills（在 my-skills 目录下）
+MY_SKILLS=(
+    "my-skills/skill-manager"
+    "my-skills/prompt-quality-checker"
+    "my-skills/daily-record"
 )
+
+# 别人的 skills（作为 submodules，自动更新）
+# 可以通过 git submodule update --remote 更新
 
 # 定义各 AI 工具的 skills 目录
 TARGETS=(
     "$HOME/.claude/skills"      # Claude Code
     # "$HOME/.codex/skills"       # Codex（取消注释以启用）
     # "$HOME/.cursor/skills"      # Cursor（取消注释以启用）
-    # "$HOME/.gemini/skills"      # Gemini（取消注释以启用）
 )
 
-echo "=== Skills Sync Script (Submodule 版) ==="
+echo "=== Skills Sync Script (混合架构) ==="
 echo ""
 
 cd "$SOURCE_DIR" || exit 1
@@ -28,16 +30,13 @@ echo "分支: $(git branch --show-current)"
 echo "最后提交: $(git log -1 --oneline)"
 echo ""
 
-# 检查并更新 submodules
-echo "📦 检查 submodules..."
+# 更新别人的 skills（submodules）
 if [ -f ".gitmodules" ]; then
-    echo "  发现 .gitmodules，更新 submodules..."
-    git submodule update --remote --recursive
+    echo "📦 更新别人的 skills (submodules)..."
+    git submodule update --remote --recursive 2>/dev/null || echo "  (没有 submodules)"
     echo "  ✅ Submodules 已更新"
-else
-    echo "  ℹ️  没有 .gitmodules，跳过 submodule 更新"
+    echo ""
 fi
-echo ""
 
 # 同步到每个工具
 for target_path in "${TARGETS[@]}"; do
@@ -51,18 +50,33 @@ for target_path in "${TARGETS[@]}"; do
 
     echo "📦 同步到: $target"
 
-    for skill in "${SKILLS[@]}"; do
-        skill_path="$SOURCE_DIR/$skill"
+    # 复制自己的 skills
+    for skill_rel in "${MY_SKILLS[@]}"; do
+        skill_name=$(basename "$skill_rel")
+        skill_path="$SOURCE_DIR/$skill_rel"
 
         if [ ! -d "$skill_path" ]; then
-            echo "  ⚠️  跳过: $skill (源目录不存在)"
+            echo "  ⚠️  跳过: $skill_name (源目录不存在)"
             continue
         fi
 
-        echo "  - $skill"
-        rm -rf "$target/$skill"
+        echo "  - $skill_name (自己的)"
+        rm -rf "$target/$skill_name"
         cp -r "$skill_path" "$target/"
     done
+
+    # 复制别人的 skills（submodules）
+    if [ -f ".gitmodules" ]; then
+        while IFS= read -r line; do
+            if [[ $line =~ path\ =\ (.+) ]]; then
+                submodule_path="${BASH_REMATCH[1]}"
+                submodule_name=$(basename "$submodule_path")
+                echo "  - $submodule_name (别人的)"
+                rm -rf "$target/$submodule_name"
+                cp -r "$SOURCE_DIR/$submodule_path" "$target/"
+            fi
+        done < .gitmodules
+    fi
 
     echo "  ✅ 完成同步到 $target"
     echo ""
@@ -70,13 +84,12 @@ done
 
 echo "=== 同步完成 ==="
 echo ""
-echo "💡 提示:"
-echo "  - 修改 skill 后，先进入 skill 目录提交："
-echo "    cd ~/workspace/skills/skill-name"
-echo "    git add . && git commit -m 'Update' && git push"
-echo "  - 然后更新主仓库："
-echo "    cd ~/workspace/skills"
-echo "    git add skill-name && git commit -m 'Update submodule' && git push"
-echo "  - 最后运行此脚本同步到所有工具"
+echo "💡 架构说明:"
+echo "  - 自己的 skills: my-skills/ 目录下，直接修改提交"
+echo "  - 别人的 skills: 作为 submodules，可通过 git submodule update 更新"
 echo ""
-echo "📚 更多信息: 查看 SUBMODULE_GUIDE.md"
+echo "📚 修改自己的 skills:"
+echo "  cd ~/workspace/skills/my-skills/your-skill"
+echo "  vim SKILL.md"
+echo "  cd .. && git add your-skill && git commit -m 'Update' && git push"
+echo "  skills-sync"
